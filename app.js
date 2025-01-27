@@ -8,6 +8,8 @@ import userRoute from "./src/routes/userRoute.js";
 import cors from "cors";
 import useragent from "express-useragent";
 import path from "path";
+import { fileURLToPath } from "url";
+import fs from "fs";
 
 // Load environment variables
 dotenv.config();
@@ -39,12 +41,40 @@ app.get("/test", (req, res, next) => {
   next(err);
 });
 
-// Set up EJS view engine
-const __dirname = path.dirname(new URL(import.meta.url).pathname);
-const normalizedDirname = __dirname.replace(/^\/?/, "").replace(/\\/g, "/");
+// Fix for ES modules __dirname
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
+// Use absolute path for production
+const viewsPath =
+  process.env.NODE_ENV === "production"
+    ? "/opt/render/project/src/src/templates"
+    : path.join(__dirname, "src", "templates");
+
+app.set("views", viewsPath);
 app.set("view engine", "ejs");
-app.set("views", path.join(normalizedDirname, "src", "templates"));
+
+// Add this for debugging
+console.log("Environment:", process.env.NODE_ENV);
+console.log("Views directory:", app.get("views"));
+console.log("Current working directory:", process.cwd());
+console.log("__dirname:", __dirname);
+
+// Add a debug endpoint
+app.get("/debug-paths", (req, res) => {
+  const viewsPath = app.get("views");
+  const debug = {
+    viewsPath,
+    viewsExists: fs.existsSync(viewsPath),
+    cwd: process.cwd(),
+    dirname: __dirname,
+    viewsContents: fs.existsSync(viewsPath)
+      ? fs.readdirSync(viewsPath)
+      : "Directory not found",
+    env: process.env.NODE_ENV,
+  };
+  res.json(debug);
+});
 
 // Error handling middleware
 app.use(notFound);
